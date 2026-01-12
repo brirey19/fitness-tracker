@@ -9,7 +9,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwdr8iWC4Kh_7qJAhAD1THS
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); 
   const [routines, setRoutines] = useState([]); // Store fetched routines
-  const [logs, setLogs] = useState([]); // Store fetched logs (for dashboard later)
+  const [logs, setLogs] = useState([]); // Store fetched logs
   const [loading, setLoading] = useState(true);
 
   // Function to fetch data from Google Sheets
@@ -18,7 +18,6 @@ function App() {
     fetch(API_URL)
       .then(response => response.json())
       .then(data => {
-        // The Google Script returns { routines: [...], logs: [...] }
         setRoutines(data.routines || []);
         setLogs(data.logs || []);
         setLoading(false);
@@ -82,25 +81,32 @@ function App() {
                   <span className="text-xs text-gray-500 ml-1">this week</span>
                 </div>
 
-                {/* Average Calculation */}
+                {/* Average Calculation (Updated for Calendar Weeks) */}
                 <div className="mt-1 pt-2 border-t border-gray-100">
                   <span className="text-lg font-bold text-gray-600">
                     {(() => {
                       const workouts = logs.filter(l => l.type === 'Workout');
                       if (workouts.length === 0) return 0;
                       
-                      // Sort by date to find the first one
+                      // 1. Find the date of the very first workout
                       const sorted = workouts.map(l => new Date(l.date)).sort((a,b) => a - b);
-                      const firstDate = sorted[0];
+                      const firstDate = new Date(sorted[0]);
+
+                      // 2. "Snap" that date back to the Sunday of that week
+                      // (This ensures we count partial weeks as a full "calendar week")
+                      const firstSunday = new Date(firstDate);
+                      const dayOfWeek = firstSunday.getDay(); // 0 is Sunday
+                      firstSunday.setDate(firstDate.getDate() - dayOfWeek);
+
+                      // 3. Count weeks from that First Sunday until Today
                       const today = new Date();
-                      
-                      // Calculate difference in weeks
-                      const diffTime = Math.abs(today - firstDate);
+                      const diffTime = Math.abs(today - firstSunday);
                       const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7)); 
                       
-                      // Prevent divide by zero or unrealistic averages on day 1
-                      const weeks = diffWeeks < 1 ? 1 : diffWeeks;
-                      return (workouts.length / weeks).toFixed(1);
+                      // Ensure divisor is at least 1
+                      const totalWeeks = diffWeeks < 1 ? 1 : diffWeeks;
+
+                      return (workouts.length / totalWeeks).toFixed(1);
                     })()}
                   </span>
                   <span className="text-xs text-gray-400 ml-1">avg / week</span>
@@ -111,7 +117,6 @@ function App() {
               <div className="bg-white p-4 rounded-lg shadow border-t-4 border-green-500">
                 <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wide">Current Weight</h2>
                 <p className="text-3xl font-extrabold text-gray-800 mt-1">
-                  {/* FIX: Sort by Date (Newest first), then take the top one */}
                   {logs
                     .filter(l => l.type === 'Weight')
                     .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort Descending
@@ -134,8 +139,7 @@ function App() {
               <ul className="divide-y divide-gray-100">
                 {logs
                   .filter(l => l.type === 'Workout') // Only show workouts
-                  // FIX: Sort by Date (Newest first) instead of "Last Entered"
-                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort Newest First
                   .slice(0, 5) // Take top 5
                   .map((log, i) => ( 
                   <li key={i} className="px-4 py-3 flex justify-between items-center text-sm">
@@ -165,7 +169,7 @@ function App() {
            <LogForm 
              API_URL={API_URL} 
              routines={routines} 
-             onSave={fetchData} // Re-fetch data after saving
+             onSave={fetchData} 
            />
         )}
 
