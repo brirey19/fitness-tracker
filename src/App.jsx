@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import RoutineForm from './components/RoutineForm';
 import LogForm from './components/LogForm';
 import WeightChart from './components/WeightChart';
+import WorkoutBarChart from './components/WorkoutBarChart';
 
 // YOUR GOOGLE WEB APP URL
 const API_URL = "https://script.google.com/macros/s/AKfycbwdr8iWC4Kh_7qJAhAD1THSlLv4KCzPDxjiiJ6g9EGLPOkvbr2O_frsMTH6a95_zO4Wuw/exec"; 
@@ -67,43 +68,45 @@ function App() {
               <div className="bg-white p-4 rounded-lg shadow border-t-4 border-blue-500">
                 <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wide">Workouts</h2>
                 
-                {/* This Week */}
+                {/* This Week (Calendar Week Logic) */}
                 <div className="mt-2">
                   <span className="text-3xl font-extrabold text-gray-800">
                     {logs.filter(l => {
                       if (l.type !== 'Workout') return false;
+                      
                       const logDate = new Date(l.date);
-                      const sevenDaysAgo = new Date();
-                      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                      return logDate >= sevenDaysAgo;
+                      const today = new Date();
+                      
+                      // Calculate the Sunday of the current week
+                      const currentSunday = new Date(today);
+                      const dayOfWeek = today.getDay(); // 0 is Sunday
+                      currentSunday.setDate(today.getDate() - dayOfWeek);
+                      currentSunday.setHours(0,0,0,0); // Start of Sunday
+
+                      // Include logs that are AFTER or ON that Sunday
+                      return logDate >= currentSunday;
                     }).length}
                   </span>
                   <span className="text-xs text-gray-500 ml-1">this week</span>
                 </div>
 
-                {/* Average Calculation (Updated for Calendar Weeks) */}
+                {/* Average Calculation (Calendar Week Logic) */}
                 <div className="mt-1 pt-2 border-t border-gray-100">
                   <span className="text-lg font-bold text-gray-600">
                     {(() => {
                       const workouts = logs.filter(l => l.type === 'Workout');
                       if (workouts.length === 0) return 0;
                       
-                      // 1. Find the date of the very first workout
+                      // 1. Find First Sunday
                       const sorted = workouts.map(l => new Date(l.date)).sort((a,b) => a - b);
                       const firstDate = new Date(sorted[0]);
-
-                      // 2. "Snap" that date back to the Sunday of that week
-                      // (This ensures we count partial weeks as a full "calendar week")
                       const firstSunday = new Date(firstDate);
-                      const dayOfWeek = firstSunday.getDay(); // 0 is Sunday
-                      firstSunday.setDate(firstDate.getDate() - dayOfWeek);
+                      firstSunday.setDate(firstDate.getDate() - firstDate.getDay());
 
-                      // 3. Count weeks from that First Sunday until Today
+                      // 2. Count weeks from First Sunday to Today
                       const today = new Date();
                       const diffTime = Math.abs(today - firstSunday);
                       const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7)); 
-                      
-                      // Ensure divisor is at least 1
                       const totalWeeks = diffWeeks < 1 ? 1 : diffWeeks;
 
                       return (workouts.length / totalWeeks).toFixed(1);
@@ -127,8 +130,11 @@ function App() {
               </div>
             </div>
 
-            {/* 2. THE CHART */}
+            {/* 2. THE GRAPHS */}
             <WeightChart logs={logs} />
+            
+            {/* NEW COLUMN GRAPH */}
+            <WorkoutBarChart logs={logs} />
 
             {/* 3. RECENT WORKOUTS LIST */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -138,9 +144,9 @@ function App() {
               </div>
               <ul className="divide-y divide-gray-100">
                 {logs
-                  .filter(l => l.type === 'Workout') // Only show workouts
-                  .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort Newest First
-                  .slice(0, 5) // Take top 5
+                  .filter(l => l.type === 'Workout') 
+                  .sort((a, b) => new Date(b.date) - new Date(a.date)) 
+                  .slice(0, 5) 
                   .map((log, i) => ( 
                   <li key={i} className="px-4 py-3 flex justify-between items-center text-sm">
                     <div>
